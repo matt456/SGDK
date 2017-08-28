@@ -12,7 +12,6 @@ INCLUDE= inc
 SHELL= $(BIN)/sh
 RM= $(BIN)/rm
 CP= $(BIN)/cp
-AR= $(BIN)/ar
 CC= $(BIN)/gcc
 LD= $(BIN)/ld
 NM= $(BIN)/nm
@@ -22,7 +21,6 @@ ASMZ80= $(BIN)/sjasm
 MACCER= $(BIN)/mac68k
 SIZEBND= $(BIN)/sizebnd
 BINTOS= $(BIN)/bintos
-GENRES= $(BIN)/genres
 RESCOMP= $(BIN)/rescomp
 MKDIR= $(BIN)/mkdir
 
@@ -37,13 +35,10 @@ SRC_S80+= $(wildcard $(SRC)/*.s80)
 
 RES_C= $(wildcard $(RES)/*.c)
 RES_S= $(wildcard $(RES)/*.s)
-RES_RC= $(wildcard *.rc)
-RES_RC+= $(wildcard $(RES)/*.rc)
 RES_RES= $(wildcard *.res)
 RES_RES+= $(wildcard $(RES)/*.res)
 
 OBJ= $(RES_RES:.res=.o)
-OBJ+= $(RES_RC:.rc=.o)
 OBJ+= $(RES_S:.s=.o)
 OBJ+= $(RES_C:.c=.o)
 OBJ+= $(SRC_S80:.s80=.o)
@@ -58,14 +53,15 @@ DEFAULT_FLAGS= -m68000 -Wall -fno-builtin $(INCS) -B$(BIN)
 FLAGSZ80= -i$(SRC) -i$(INCLUDE) -i$(RES) -i$(LIBSRC) -i$(LIBINCLUDE)
 
 
-#release: FLAGS= $(DEFAULT_FLAGS) -O3 -fno-web -fno-gcse -fno-unit-at-a-time -fomit-frame-pointer
-release: FLAGS= $(DEFAULT_FLAGS) -O1 -fomit-frame-pointer
+release: FLAGS= $(DEFAULT_FLAGS) -O3 -flto -fuse-linker-plugin -fno-web -fno-gcse -fno-unit-at-a-time -fomit-frame-pointer
+#release: FLAGS= $(DEFAULT_FLAGS) -O3 -S -fomit-frame-pointer
+#release: FLAGS= $(DEFAULT_FLAGS) -O1 -fomit-frame-pointer
 release: LIBMD= $(LIB)/libmd.a
-release: out/rom.bin
+release: pre-build out/rom.bin
 
 debug: FLAGS= $(DEFAULT_FLAGS) -O1 -ggdb -DDEBUG=1
 debug: LIBMD= $(LIB)/libmd_debug.a
-debug: out/rom.bin out/rom.out out/symbol.txt
+debug: pre-build out/rom.bin out/rom.out out/symbol.txt
 
 
 all: release
@@ -76,7 +72,6 @@ Debug: debug
 Release: release
 
 .PHONY: clean
-
 
 cleanobj:
 	$(RM) -f $(OBJS) out/sega.o out/rom_head.bin out/rom_head.o out/rom.out
@@ -89,11 +84,17 @@ cleanrelease: clean
 cleandebug: clean
 	$(RM) -f  out/symbol.txt
 
-
 cleandefault: clean
 cleanDefault: clean
 cleanRelease: cleanrelease
 cleanDebug: cleandebug
+
+
+pre-build:
+	$(MKDIR) -p $(SRC)/boot
+	$(MKDIR) -p out
+	$(MKDIR) -p out/src
+	$(MKDIR) -p out/res
 
 
 out/rom.bin: out/rom.out
@@ -101,7 +102,7 @@ out/rom.bin: out/rom.out
 	$(SIZEBND) out/rom.bin -sizealign 131072
 
 out/symbol.txt: out/rom.out
-	$(NM) out/rom.out > out/symbol.txt
+	$(NM) --plugin=liblto_plugin-0.dll -n out/rom.out > out/symbol.txt
 
 out/rom.out: out/sega.o out/cmd_ $(LIBMD)
 	$(CC) -B$(BIN) -n -T $(GDK)/md.ld -nostdlib out/sega.o @out/cmd_ $(LIBMD) $(LIB)/libgcc.a -o out/rom.out
@@ -111,42 +112,29 @@ out/cmd_: $(OBJS)
 	$(ECHO) "$(OBJS)" > out/cmd_
 
 out/sega.o: $(SRC)/boot/sega.s out/rom_head.bin
-	$(MKDIR) -p out
-	$(CC) $(FLAGS) -c $(SRC)/boot/sega.s -o $@
+	$(CC) $(DEFAULT_FLAGS) -c $(SRC)/boot/sega.s -o $@
 
 out/rom_head.bin: out/rom_head.o
 	$(LD) -T $(GDK)/md.ld -nostdlib --oformat binary -o $@ $<
 
 out/rom_head.o: $(SRC)/boot/rom_head.c
-	$(MKDIR) -p out
-	$(CC) $(FLAGS) -c $< -o $@
+	$(CC) $(DEFAULT_FLAGS) -c $< -o $@
 
 $(SRC)/boot/sega.s: $(LIBSRC)/boot/sega.s
-	$(MKDIR) -p $(SRC)/boot
 	$(CP) $< $@
 
 $(SRC)/boot/rom_head.c: $(LIBSRC)/boot/rom_head.c
-	$(MKDIR) -p $(SRC)/boot
 	$(CP) $< $@
 
 
 out/%.o: %.c
-	$(MKDIR) -p out
-	$(MKDIR) -p out/src
-	$(MKDIR) -p out/res
 	$(CC) $(FLAGS) -c $< -o $@
 
 out/%.o: %.s
-	$(MKDIR) -p out
-	$(MKDIR) -p out/src
-	$(MKDIR) -p out/res
 	$(CC) $(FLAGS) -c $< -o $@
 
 %.s: %.res
 	$(RESCOMP) $< $@
-
-%.asm: %.rc
-	$(GENRES) $< $@
 
 %.s: %.asm
 	$(MACCER) -o $@ $<

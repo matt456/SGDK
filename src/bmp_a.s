@@ -6,6 +6,8 @@ clearBitmapBuffer:
 
     movm.l %d2-%d7/%a2-%a6,-(%sp)
 
+    | the function consume about 43200 cycles to clear the whole bitmap buffer
+
     moveq #0,%d1
     move.l %d1,%d2
     move.l %d1,%d3
@@ -39,6 +41,85 @@ clearBitmapBuffer:
     movm.l %d1-%d7/%a1-%a6,-(%a0)
     movm.l %d1-%d7/%a1-%a6,-(%a0)
     movm.l %d1-%d7/%a1-%a4,-(%a0)
+
+    movm.l (%sp)+,%d2-%d7/%a2-%a6
+    rts
+
+
+    .globl    copyBitmapBuffer
+    .type    copyBitmapBuffer, @function
+copyBitmapBuffer:
+    move.l 4(%sp),%a0           | a0 = src
+    move.l 8(%sp),%a1           | a1 = dest
+
+    movm.l %d2-%d7/%a2-%a6,-(%sp)
+
+    | first 32 bytes transfer
+    | remaing 20448 bytes to copy
+    | the function consume about 92000 cycles to copy the whole bitmap buffer
+
+    lea 20480(%a1),%a1          | a1 = dest end
+
+    movm.l 20448(%a0),%d1-%d7/%a2
+    movm.l %d1-%d7/%a2,-(%a1)
+
+    lea    20400(%a0),%a0       | a0 = src end - (48 + 32)
+
+    moveq #41,%d0               | 42 * (48 bytes * 10) = 42 * 480 = 20160 (/20448)
+
+.L02:
+    movm.l (%a0),%d1-%d7/%a2-%a6
+    lea    -48(%a0),%a0
+    movm.l %d1-%d7/%a2-%a6,-(%a1)       | 216 cycles for 48 bytes copy
+    movm.l (%a0),%d1-%d7/%a2-%a6
+    lea    -48(%a0),%a0
+    movm.l %d1-%d7/%a2-%a6,-(%a1)
+    movm.l (%a0),%d1-%d7/%a2-%a6
+    lea    -48(%a0),%a0
+    movm.l %d1-%d7/%a2-%a6,-(%a1)
+    movm.l (%a0),%d1-%d7/%a2-%a6
+    lea    -48(%a0),%a0
+    movm.l %d1-%d7/%a2-%a6,-(%a1)
+    movm.l (%a0),%d1-%d7/%a2-%a6
+    lea    -48(%a0),%a0
+    movm.l %d1-%d7/%a2-%a6,-(%a1)
+    movm.l (%a0),%d1-%d7/%a2-%a6
+    lea    -48(%a0),%a0
+    movm.l %d1-%d7/%a2-%a6,-(%a1)
+    movm.l (%a0),%d1-%d7/%a2-%a6
+    lea    -48(%a0),%a0
+    movm.l %d1-%d7/%a2-%a6,-(%a1)
+    movm.l (%a0),%d1-%d7/%a2-%a6
+    lea    -48(%a0),%a0
+    movm.l %d1-%d7/%a2-%a6,-(%a1)
+    movm.l (%a0),%d1-%d7/%a2-%a6
+    lea    -48(%a0),%a0
+    movm.l %d1-%d7/%a2-%a6,-(%a1)
+    movm.l (%a0),%d1-%d7/%a2-%a6
+    lea    -48(%a0),%a0
+    movm.l %d1-%d7/%a2-%a6,-(%a1)
+
+    dbra %d0,.L02
+
+    | 288 bytes remaining = 6 * 48
+
+    movm.l (%a0),%d1-%d7/%a2-%a6
+    lea    -48(%a0),%a0
+    movm.l %d1-%d7/%a2-%a6,-(%a1)
+    movm.l (%a0),%d1-%d7/%a2-%a6
+    lea    -48(%a0),%a0
+    movm.l %d1-%d7/%a2-%a6,-(%a1)
+    movm.l (%a0),%d1-%d7/%a2-%a6
+    lea    -48(%a0),%a0
+    movm.l %d1-%d7/%a2-%a6,-(%a1)
+    movm.l (%a0),%d1-%d7/%a2-%a6
+    lea    -48(%a0),%a0
+    movm.l %d1-%d7/%a2-%a6,-(%a1)
+    movm.l (%a0),%d1-%d7/%a2-%a6
+    lea    -48(%a0),%a0
+    movm.l %d1-%d7/%a2-%a6,-(%a1)
+    movm.l (%a0),%d1-%d7/%a2-%a6
+    movm.l %d1-%d7/%a2-%a6,-(%a1)
 
     movm.l (%sp)+,%d2-%d7/%a2-%a6
     rts

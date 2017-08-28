@@ -22,6 +22,22 @@ static Map *allocateMapInternal(const Map *map, void *adr);
 // internal
 static u32 framecnt;
 static u32 last;
+u16 randbase;
+
+
+void setRandomSeed(u16 seed)
+{
+    // xor it with a random value to avoid 0 value
+    randbase = seed ^ 0xD94B;
+}
+
+u16 random()
+{
+    randbase ^= (randbase >> 1) ^ GET_HVCOUNTER;
+    randbase ^= (randbase << 1);
+
+    return randbase;
+}
 
 u32 getFPS()
 {
@@ -86,6 +102,19 @@ void KLog_U1(char* t1, u32 v1)
     KDebug_Alert(str);
 }
 
+void KLog_U1_(char* t1, u32 v1, char* t2)
+{
+    char str[256];
+    char tmp[12];
+
+    strcpy(str, t1);
+    uintToStr(v1, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t2);
+
+    KDebug_Alert(str);
+}
+
 void KLog_U2(char* t1, u32 v1, char* t2, u32 v2)
 {
     char str[256];
@@ -97,6 +126,22 @@ void KLog_U2(char* t1, u32 v1, char* t2, u32 v2)
     strcat(str, t2);
     uintToStr(v2, tmp, 1);
     strcat(str, tmp);
+
+    KDebug_Alert(str);
+}
+
+void KLog_U2_(char* t1, u32 v1, char* t2, u32 v2, char* t3)
+{
+    char str[256];
+    char tmp[12];
+
+    strcpy(str, t1);
+    uintToStr(v1, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t2);
+    uintToStr(v2, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t3);
 
     KDebug_Alert(str);
 }
@@ -115,6 +160,25 @@ void KLog_U3(char* t1, u32 v1, char* t2, u32 v2, char* t3, u32 v3)
     strcat(str, t3);
     uintToStr(v3, tmp, 1);
     strcat(str, tmp);
+
+    KDebug_Alert(str);
+}
+
+void KLog_U3_(char* t1, u32 v1, char* t2, u32 v2, char* t3, u32 v3, char *t4)
+{
+    char str[256];
+    char tmp[12];
+
+    strcpy(str, t1);
+    uintToStr(v1, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t2);
+    uintToStr(v2, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t3);
+    uintToStr(v3, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t4);
 
     KDebug_Alert(str);
 }
@@ -140,6 +204,28 @@ void KLog_U4(char* t1, u32 v1, char* t2, u32 v2, char* t3, u32 v3, char* t4, u32
     KDebug_Alert(str);
 }
 
+void KLog_U4_(char* t1, u32 v1, char* t2, u32 v2, char* t3, u32 v3, char* t4, u32 v4, char* t5)
+{
+    char str[256];
+    char tmp[12];
+
+    strcpy(str, t1);
+    uintToStr(v1, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t2);
+    uintToStr(v2, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t3);
+    uintToStr(v3, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t4);
+    uintToStr(v4, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t5);
+
+    KDebug_Alert(str);
+}
+
 void KLog_U1x(u16 minSize, char* t1, u32 v1)
 {
     char str[256];
@@ -148,6 +234,19 @@ void KLog_U1x(u16 minSize, char* t1, u32 v1)
     strcpy(str, t1);
     uintToStr(v1, tmp, minSize);
     strcat(str, tmp);
+
+    KDebug_Alert(str);
+}
+
+void KLog_U1x_(u16 minSize, char* t1, u32 v1, char* t2)
+{
+    char str[256];
+    char tmp[12];
+
+    strcpy(str, t1);
+    uintToStr(v1, tmp, minSize);
+    strcat(str, tmp);
+    strcat(str, t2);
 
     KDebug_Alert(str);
 }
@@ -167,6 +266,22 @@ void KLog_U2x(u16 minSize, char* t1, u32 v1, char* t2, u32 v2)
     KDebug_Alert(str);
 }
 
+void KLog_U2x_(u16 minSize, char* t1, u32 v1, char* t2, u32 v2, char* t3)
+{
+    char str[256];
+    char tmp[12];
+
+    strcpy(str, t1);
+    uintToStr(v1, tmp, minSize);
+    strcat(str, tmp);
+    strcat(str, t2);
+    uintToStr(v2, tmp, minSize);
+    strcat(str, tmp);
+    strcat(str, t3);
+
+    KDebug_Alert(str);
+}
+
 void KLog_U3x(u16 minSize, char* t1, u32 v1, char* t2, u32 v2, char* t3, u32 v3)
 {
     char str[256];
@@ -181,6 +296,25 @@ void KLog_U3x(u16 minSize, char* t1, u32 v1, char* t2, u32 v2, char* t3, u32 v3)
     strcat(str, t3);
     uintToStr(v3, tmp, minSize);
     strcat(str, tmp);
+
+    KDebug_Alert(str);
+}
+
+void KLog_U3x_(u16 minSize, char* t1, u32 v1, char* t2, u32 v2, char* t3, u32 v3, char* t4)
+{
+    char str[256];
+    char tmp[12];
+
+    strcpy(str, t1);
+    uintToStr(v1, tmp, minSize);
+    strcat(str, tmp);
+    strcat(str, t2);
+    uintToStr(v2, tmp, minSize);
+    strcat(str, tmp);
+    strcat(str, t3);
+    uintToStr(v3, tmp, minSize);
+    strcat(str, tmp);
+    strcat(str, t4);
 
     KDebug_Alert(str);
 }
@@ -206,6 +340,28 @@ void KLog_U4x(u16 minSize, char* t1, u32 v1, char* t2, u32 v2, char* t3, u32 v3,
     KDebug_Alert(str);
 }
 
+void KLog_U4x_(u16 minSize, char* t1, u32 v1, char* t2, u32 v2, char* t3, u32 v3, char* t4, u32 v4, char* t5)
+{
+    char str[256];
+    char tmp[12];
+
+    strcpy(str, t1);
+    uintToStr(v1, tmp, minSize);
+    strcat(str, tmp);
+    strcat(str, t2);
+    uintToStr(v2, tmp, minSize);
+    strcat(str, tmp);
+    strcat(str, t3);
+    uintToStr(v3, tmp, minSize);
+    strcat(str, tmp);
+    strcat(str, t4);
+    uintToStr(v4, tmp, minSize);
+    strcat(str, tmp);
+    strcat(str, t5);
+
+    KDebug_Alert(str);
+}
+
 void KLog_S1(char* t1, s32 v1)
 {
     char str[256];
@@ -214,6 +370,19 @@ void KLog_S1(char* t1, s32 v1)
     strcpy(str, t1);
     intToStr(v1, tmp, 1);
     strcat(str, tmp);
+
+    KDebug_Alert(str);
+}
+
+void KLog_S1_(char* t1, s32 v1, char* t2)
+{
+    char str[256];
+    char tmp[12];
+
+    strcpy(str, t1);
+    intToStr(v1, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t2);
 
     KDebug_Alert(str);
 }
@@ -229,6 +398,22 @@ void KLog_S2(char* t1, s32 v1, char* t2, s32 v2)
     strcat(str, t2);
     intToStr(v2, tmp, 1);
     strcat(str, tmp);
+
+    KDebug_Alert(str);
+}
+
+void KLog_S2_(char* t1, s32 v1, char* t2, s32 v2, char* t3)
+{
+    char str[256];
+    char tmp[12];
+
+    strcpy(str, t1);
+    intToStr(v1, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t2);
+    intToStr(v2, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t3);
 
     KDebug_Alert(str);
 }
@@ -251,6 +436,25 @@ void KLog_S3(char* t1, s32 v1, char* t2, s32 v2, char* t3, s32 v3)
     KDebug_Alert(str);
 }
 
+void KLog_S3_(char* t1, s32 v1, char* t2, s32 v2, char* t3, s32 v3, char* t4)
+{
+    char str[256];
+    char tmp[12];
+
+    strcpy(str, t1);
+    intToStr(v1, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t2);
+    intToStr(v2, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t3);
+    intToStr(v3, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t4);
+
+    KDebug_Alert(str);
+}
+
 void KLog_S4(char* t1, s32 v1, char* t2, s32 v2, char* t3, s32 v3, char* t4, s32 v4)
 {
     char str[256];
@@ -268,6 +472,28 @@ void KLog_S4(char* t1, s32 v1, char* t2, s32 v2, char* t3, s32 v3, char* t4, s32
     strcat(str, t4);
     intToStr(v4, tmp, 1);
     strcat(str, tmp);
+
+    KDebug_Alert(str);
+}
+
+void KLog_S4_(char* t1, s32 v1, char* t2, s32 v2, char* t3, s32 v3, char* t4, s32 v4, char* t5)
+{
+    char str[256];
+    char tmp[12];
+
+    strcpy(str, t1);
+    intToStr(v1, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t2);
+    intToStr(v2, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t3);
+    intToStr(v3, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t4);
+    intToStr(v4, tmp, 1);
+    strcat(str, tmp);
+    strcat(str, t5);
 
     KDebug_Alert(str);
 }
@@ -795,22 +1021,6 @@ Image *allocateImage(const Image *image)
     return result;
 }
 
-TileSet *getTileSet(SubTileSet *subTileSet, TileSet *dest)
-{
-    TileSet *result;
-    TileSet *ref;
-
-    if (dest) result = dest;
-    else result = allocateTileSetEx(subTileSet->numTile);
-
-    ref = subTileSet->tileSet;
-
-    // extract
-    unpackEx(ref->compression, (u8*) ref->tiles, (u8*) result->tiles, subTileSet->offset, subTileSet->size);
-
-    return result;
-}
-
 
 Bitmap *unpackBitmap(const Bitmap *src, Bitmap *dest)
 {
@@ -908,224 +1118,171 @@ Image *unpackImage(const Image *src, Image *dest)
 }
 
 
-u16 unpackEx(u16 compression, u8 *src, u8 *dest, u32 offset, u16 size)
+u32 unpack(u16 compression, u8 *src, u8 *dest)
 {
     switch(compression)
     {
-        case COMPRESSION_NONE:
-            // cannot do anything...
-            if (size == 0) return FALSE;
-
-            // use simple memory copy
-            memcpy(dest, &src[offset], size);
-            break;
-
-        case COMPRESSION_APLIB:
-            // not supported
-            if ((offset != 0) || (size != 0))  return FALSE;
-
-            aplib_unpack(src, dest);
-            break;
-
-//        case COMPRESSION_LZKN:
-//            lzkn_unpack(src, dest);
+//        case COMPRESSION_NONE:
+//            // cannot do anything...
+//            if (size == 0) return FALSE;
+//
+//            // use simple memory copy
+//            memcpy(dest, &src[offset], size);
 //            break;
 
-        case COMPRESSION_RLE:
-            rle4b_unpack(src, dest, offset, size);
-            break;
+        case COMPRESSION_APLIB:
+            return aplib_unpack(src, dest);
 
-        case COMPRESSION_MAP_RLE:
-            rlemap_unpack(src, dest, offset, size);
-            break;
+        case COMPRESSION_LZ4W:
+            return lz4w_unpack(src, dest);
 
         default:
-            return FALSE;
-    }
-
-    return TRUE;
-}
-
-void unpack(u16 compression, u8 *src, u8 *dest)
-{
-    unpackEx(compression, src, dest, 0, 0);
-}
-
-
-void rle4b_unpack(u8 *src, u8 *dest, u32 offset, u16 size)
-{
-    u8 *s;
-    u32 *d;
-    u32 data;
-    u16 blocnum;
-    u16 data_cnt;
-
-    if (size == 0)
-    {
-        blocnum = *((unsigned short*)src);
-        s = src + 2;
-    }
-    else
-    {
-        blocnum = size;
-        s = src + 2 + offset;
-    }
-
-    d = (u32*) dest;
-    data = 0;
-    data_cnt = 7;
-    while (blocnum--)
-    {
-        const u8 v8 = *s++;
-        const u32 d4 = v8 & 0xF;
-        u16 len = (v8 >> 4) + 1;
-
-        while(len--)
-        {
-            data <<= 4;
-            data |= d4;
-
-            if (!data_cnt--)
-            {
-                *d++ = data;
-                data_cnt = 7;
-            }
-        }
+            return 0;
     }
 }
 
-void rlemap_unpack(u8 *src, u8 *dest, u32 offset, u16 size)
-{
-    u8 *s;
-    u16 *d;
-    u16 blocnum;
 
-    if (size == 0)
-    {
-        blocnum = *((unsigned short*)src);
-        s = src + 2;
-    }
-    else
-    {
-        blocnum = size;
-        s = src + 2 + offset;
-    }
-
-    d = (u16*) dest;
-    while (blocnum--)
-    {
-        u16 data;
-        const u8 v8 = *s++;
-        u16 len = (v8 & 0x7F) + 1;
-
-        data = (s[0] << 8) | (s[1] << 0);
-        s += 2;
-
-        // increment mode
-        if (v8 & 0x80)
-        {
-            while(len--)
-                *d++ = data++;
-        }
-        else
-        {
-            while(len--)
-                *d++ = data;
-        }
-    }
-}
-
-void rle4b_unpackVRam(u8 *src, u16 dest, u32 offset, u16 size)
-{
-    vu32 *plctrl;
-    vu32 *pldata;
-    u8 *s;
-    u32 data;
-    u16 blocnum;
-    u16 data_cnt;
-
-    VDP_setAutoInc(2);
-
-    /* point to vdp port */
-    plctrl = (u32 *) GFX_CTRL_PORT;
-    pldata = (u32 *) GFX_DATA_PORT;
-
-    *plctrl = GFX_WRITE_VRAM_ADDR(dest);
-
-    if (size == 0)
-    {
-        blocnum = *((unsigned short*)src);
-        s = src + 2;
-    }
-    else
-    {
-        blocnum = size;
-        s = src + 2 + offset;
+#define QSORT(type)                                     \
+    u16 partition_##type(type *data, u16 p, u16 r)      \
+    {                                                   \
+        type x = data[p];                               \
+        u16 i = p - 1;                                  \
+        u16 j = r + 1;                                  \
+                                                        \
+        while (TRUE)                                    \
+        {                                               \
+            i++;                                        \
+            while ((i < r) && (data[i] < x)) i++;       \
+            j--;                                        \
+            while ((j > p) && (data[j] > x)) j--;       \
+                                                        \
+            if (i < j)                                  \
+            {                                           \
+                type tmp;                               \
+                                                        \
+                tmp = data[i];                          \
+                data[i] = data[j];                      \
+                data[j] = tmp;                          \
+            }                                           \
+            else                                        \
+                return j;                               \
+        }                                               \
+    }                                                   \
+                                                        \
+    void qsort_##type(type *data, u16 p, u16 r)         \
+    {                                                   \
+        if (p < r)                                      \
+        {                                               \
+            u16 q = partition_##type(data, p, r);       \
+            qsort_##type(data, p, q);                   \
+            qsort_##type(data, q + 1, r);               \
+        }                                               \
     }
 
-    data = 0;
-    data_cnt = 7;
-    while (blocnum--)
-    {
-        const u8 v8 = *s++;
-        const u32 d4 = v8 & 0xF;
-        u16 len = (v8 >> 4) + 1;
 
-        while(len--)
-        {
-            data <<= 4;
-            data |= d4;
+QSORT(u8)
+QSORT(s8)
+QSORT(u16)
+QSORT(s16)
+QSORT(u32)
+QSORT(s32)
 
-            if (!data_cnt--)
-            {
-                *pldata = data;
-                data_cnt = 7;
-            }
-        }
-    }
-}
 
-void uftc_unpack_old(u8* src, u8 *dest, u16 index, u16 cnt)
-{
-    // Get size of dictionary
-    u16 dirsize = *src++;
-    // Get addresses of dictionary and first tile to decompress
-    u16 *dir = (u16*) src;
 
-    src += dirsize + (index << 4);
+//--> try to improve qsort speed (test on spr_engine sort exemple)
 
-    // Decompress all tiles
-    for (; cnt != 0; cnt--)
-    {
-        // To store pointers to 4x4 blocks
-        u16 *block1, *block2;
+//// Sorting generic structure
+//struct  QSORT_ENTRY
+//{
+//    fix16   value;
+//    u16    index;
+//};
+//
+//static struct QSORT_ENTRY t;
+//
+////------------------------------------------------------
+//inline void    QSwap (struct QSORT_ENTRY *a, struct QSORT_ENTRY *b)
+////------------------------------------------------------
+//{
+//    // struct QSORT_ENTRY t = *a;
+//    t = *a;
+//    *a = *b;
+//    *b = t;
+//}
+//
+////----------------------------------------
+//// http://rosettacode.org/wiki/Sorting_algorithms/Quicksort#C
+//inline void    QuickSort (u16 n, struct QSORT_ENTRY *a)
+////----------------------------------------
+//{
+//    short i, j, p;
+//    if (n < 2)
+//        return;
+//    p = a[n >> 1].value;
+//    for (i = 0, j = n - 1;; i++, j--) {
+//        while (a[i].value < p)
+//            i++;
+//        while (p < a[j].value)
+//            j--;
+//        if (i >= j)
+//            break;
+//
+//        QSwap(&a[i], &a[j]);
+//    }
+//    QuickSort(i, a);
+//    QuickSort(n - i, a + i);
+//}
 
-        // Retrieve location in the dictionary of first pair of 4x4 blocks
-        block1 = dir + *src++;
-        block2 = dir + *src++;
-
-        // Decompress first pair of 4x4 blocks
-        *dest++ = *block1++;
-        *dest++ = *block2++;
-        *dest++ = *block1++;
-        *dest++ = *block2++;
-        *dest++ = *block1++;
-        *dest++ = *block2++;
-        *dest++ = *block1++;
-        *dest++ = *block2++;
-
-        // Retrieve location src the dictionary of second pair of 4x4 blocks
-        block1 = dir + *src++;
-        block2 = dir + *src++;
-
-        // Decompress second pair of 4x4 blocks
-        *dest++ = *block1++;
-        *dest++ = *block2++;
-        *dest++ = *block1++;
-        *dest++ = *block2++;
-        *dest++ = *block1++;
-        *dest++ = *block2++;
-        *dest++ = *block1++;
-        *dest++ = *block2++;
-    }
-}
+//void** qsort_part(void** l, void** r, _comparatorCallback* cb)
+//{
+//    void** p = l + ((r - l) / 2);
+//    void* pivot = *p;
+//
+//    while (TRUE)
+//    {
+//        while ((l < r) && (cb(*r, pivot) >= 0)) r--;
+//        while ((l < r) && (cb(*l, pivot) <= 0)) l++;
+//
+//        if (l < r)
+//        {
+//            void* tmp = *l;
+//            *l = *r;
+//            *r = tmp;
+//        }
+//        else return l;
+//    }
+//}
+//
+///*
+//5 3 8 7  2  1 1 8 7
+//l        p        r
+//5 3 8 7  2  1 1 8 7
+//l             r
+//1 3 8 7  2  1 5 8 7
+//l             r
+//1 3 8 7  2  1 5 8 7
+//  l         r
+//1 1 8 7  2  3 5 8 7
+//  l         r
+//1 1 8 7  2  3 5 8 7
+//    l    r
+//1 1 2 7  8  3 5 8 7
+//    l    r
+//1 1 2 7  8  3 5 8 7
+//      lr
+//*/
+//
+//void qsort_rec(void** l, void** r, _comparatorCallback* cb)
+//{
+//    if (l < r)
+//    {
+//        void** p = qsort_part(l, r, cb);
+//        qsort_rec(l, p, cb);
+//        qsort_rec(p + 1, r, cb);
+//    }
+//}
+//
+//void QSort(void** data, u16 size, _comparatorCallback* cb)
+//{
+//    qsort_rec(&data[0], &data[size - 1], cb);
+//}

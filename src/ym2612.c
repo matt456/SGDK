@@ -14,7 +14,7 @@ void YM2612_reset()
 
     bus_taken = Z80_isBusTaken();
     if (!bus_taken)
-        Z80_requestBus(1);
+        Z80_requestBus(TRUE);
 
     // enable left and right output for all channel
     for(i = 0; i < 3; i++)
@@ -63,7 +63,7 @@ void YM2612_write(const u16 port, const u8 data)
 {
     vs8 *pb;
 
-    pb = (u8*) YM2612_BASEPORT;
+    pb = (s8*) YM2612_BASEPORT;
 
     // wait while YM2612 busy
     while (*pb < 0);
@@ -81,7 +81,7 @@ void YM2612_writeReg(const u16 part, const u8 reg, const u8 data)
     vs8 *pb;
     u16 port;
 
-    pb = (u8*) YM2612_BASEPORT;
+    pb = (s8*) YM2612_BASEPORT;
     port = (part << 1) & 2;
 
     // wait while YM2612 busy

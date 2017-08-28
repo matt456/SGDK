@@ -6,23 +6,41 @@
 #include "../inc/spr_tools.h"
 #include "../inc/tools.h"
 
+static int getMaxNumTileAnimation(animation_* animation);
+static int getMaxNumSpriteAnimation(animation_* animation);
 
-frameSprite_* getFrameSprite(unsigned char *image8bpp, int wi, int x, int y, int w, int h)
+
+frameSprite_* getFlippedFrameSprite(frameSprite_* frameSprite, int wf, int hf, int hflip, int vflip)
+{
+    frameSprite_* result;
+
+    // allocate result
+    result = malloc(sizeof(frameSprite_));
+
+    // initialized afterward
+    if (hflip) result->x = (wf * 8) - (frameSprite->x + (frameSprite->w * 8));
+    else result->x = frameSprite->x;
+    if (vflip) result->y = (hf * 8) - (frameSprite->y + (frameSprite->h * 8));
+    else result->y = frameSprite->y;
+    result->w = frameSprite->w;
+    result->h = frameSprite->h;
+    result->numTile = frameSprite->numTile;
+
+    return result;
+}
+
+frameSprite_* getFrameSprite(unsigned char *image8bpp, tileset_* tileset, int wi, int x, int y, int w, int h)
 {
     int i, j;
-    int p, pal;
+    int pal, p;
     int index;
     unsigned int tile[8];
     frameSprite_* result;
-    tileset_* tileset;
 
-    // get palette for this sprite
-    pal = getTile(image8bpp, tile, 0, 0, wi * 8);
-    // error retrieving tile --> return NULL
+    // get palette for this VDP sprite
+    pal = getTile(image8bpp, tile, x, y, wi * 8);
+    // error retrieving palette --> return NULL
     if (pal == -1) return NULL;
-
-    // allocate tileset
-    tileset = createTileSet(malloc(w * h * 32), 0);
 
     for(i = 0; i < w; i++)
     {
@@ -32,107 +50,107 @@ frameSprite_* getFrameSprite(unsigned char *image8bpp, int wi, int x, int y, int
 
             // error retrieving tile --> return NULL
             if (p == -1)
-            {
-                freeTileset(tileset);
                 return NULL;
-            }
             // different palette in VDP same sprite --> error
             if (p != pal)
             {
-                printf("Error: Sprite at position (%d,%d) of size [%d,%d] reference different palette.", x, y, w, h);
-                freeTileset(tileset);
+                printf("Error: Sprite at position (%d,%d) of size [%d,%d] use a different palette.", x, y, w, h);
                 return NULL;
             }
 
-            index = addTile(tile, tileset, FALSE);
+            index = addTile(tile, tileset, FALSE, TILE_MAX_NUM);
             // error adding new tile --> return NULL
             if (index == -1)
-            {
-                freeTileset(tileset);
                 return NULL;
-            }
         }
     }
 
     // allocate result
     result = malloc(sizeof(frameSprite_));
-    // always first index as we
-    result->ind = 0;
-    result->attr = TILE_ATTR(pal, FALSE, FALSE, FALSE);
     // initialized afterward
     result->x = 0;
 	result->y = 0;
     result->w = w;
     result->h = h;
-	result->tileset = tileset;
+    result->numTile = w * h;
 
     return result;
 }
 
-animFrame_* getAnimFrame(unsigned char *image8bpp, int wi, int fx, int fy, int wf, int hf, int time, int collision)
+animFrame_* getAnimFrame(unsigned char *image8bpp, int wi, int fx, int fy, int wf, int hf, int time, int collisionType)
 {
     int i, j;
     int nbSprW, nbSprH;
+    int numSprite;
     int lastSprW, lastSprH;
     int ws, hs;
     animFrame_* result;
     frameSprite_** frameSprites;
     frameSprite_* frameSprite;
-    box_* box;
-    circle_* circle;
+    tileset_* tileset;
 
     nbSprW = (wf + 3) / 4;
     nbSprH = (hf + 3) / 4;
+    numSprite = nbSprW * nbSprH;
     lastSprW = wf & 3;
     if (lastSprW == 0) lastSprW = 4;
     lastSprH = hf & 3;
     if (lastSprH == 0) lastSprH = 4;
 
+    // allocate tileset
+    tileset = createTileSet(malloc(wf * hf * 32), 0);
+
     // allocate result
     result = malloc(sizeof(animFrame_));
-    result->numSprite = nbSprW * nbSprH;
-    // allocate frameSprite array
-    frameSprites = malloc(result->numSprite * sizeof(frameSprite_*));
+    result->numSprite = numSprite;
+
+    // allocate frameSprite array (H,V,HV flipped version as well)
+    frameSprites = malloc(4 * numSprite * sizeof(frameSprite_*));
+
     result->frameSprites = frameSprites;
+    result->tileset = tileset;
 	result->w = wf;
 	result->h = hf;
-	result->tc = collision;
     result->timer = time;
 
-    // handle collision structure
-    switch(collision)
+    if (collisionType == COLLISION_NONE) result->collision = NULL;
+    else
     {
-        case COLLISION_NONE:
-            result->numCollision = 0;
-            result->collisions = NULL;
-        break;
+        collision_* collision;
 
-        case COLLISION_BOX:
-            result->numCollision = 1;
-            // allocate collision array
-            result->collisions = malloc(1 * sizeof(void*));
-            // allocate collision structure
-            box = malloc(sizeof(box_));
-            // use 75% the size of the frame for the collision
-            box->x = (wf * 8) / 2;
-            box->y = (hf * 8) / 2;
-            box->w = ((wf * 8) * 3) / 4;
-            box->h = ((hf * 8) * 3) / 4;
-            result->collisions[0] = box;
-        break;
+        // allocate collision structure
+        collision = malloc(sizeof(collision_));
 
-        case COLLISION_CIRCLE:
-            result->numCollision = 1;
-            // allocate collision array
-            result->collisions = malloc(1 * sizeof(void*));
-            // allocate collision structure
-            circle = malloc(sizeof(circle_));
-            // use 75% the size of the frame for the collision
-            circle->x = (wf * 8) / 2;
-            circle->y = (hf * 8) / 2;
-            circle->ray = ((wf * 8) * 3) / 4;
-            result->collisions[0] = circle;
-        break;
+        switch(collisionType)
+        {
+            case COLLISION_BOX:
+                // use 75% the size of the frame for the collision
+                collision->norm.box.x = (wf * 8) / (4 * 2);
+                collision->norm.box.y = (hf * 8) / (4 * 2);
+                collision->norm.box.w = ((wf * 8) * 3) / 4;
+                collision->norm.box.h = ((hf * 8) * 3) / 4;
+            break;
+
+            case COLLISION_CIRCLE:
+                // use 75% the size of the frame for the collision
+                collision->norm.circle.x = (wf * 8) / 2;
+                collision->norm.circle.y = (hf * 8) / 2;
+                collision->norm.circle.ray = ((wf * 8) * 3) / 8;
+            break;
+        }
+
+        // single collision
+        collision->inner = NULL;
+        collision->next = NULL;
+
+        // use same collision info for H,V and HV flip version as we use centered collision here
+        collision->hvflip.box.x = collision->vflip.box.x = collision->hflip.box.x = collision->norm.box.x;
+        collision->hvflip.box.y = collision->vflip.box.y = collision->hflip.box.y = collision->norm.box.y;
+        collision->hvflip.box.w = collision->vflip.box.w = collision->hflip.box.w = collision->norm.box.w;
+        collision->hvflip.box.h = collision->vflip.box.h = collision->hflip.box.h = collision->norm.box.h;
+
+        // store
+        result->collision = collision;
     }
 
     for(j = 0; j < nbSprH; j++)
@@ -145,13 +163,20 @@ animFrame_* getAnimFrame(unsigned char *image8bpp, int wi, int fx, int fy, int w
             if (i == (nbSprW - 1)) ws = lastSprW;
             else ws = 4;
 
-            frameSprite = getFrameSprite(image8bpp, wi, (fx * wf) + (i * 4), (fy * hf) + (j * 4), ws, hs);
-            if (frameSprite == NULL) return NULL;
+            frameSprite = getFrameSprite(image8bpp, tileset, wi, (fx * wf) + (i * 4), (fy * hf) + (j * 4), ws, hs);
+            if (frameSprite == NULL)
+                return NULL;
 
             // set x and y offset
             frameSprite->x = i * 32;
             frameSprite->y = j * 32;
-            *frameSprites++ = frameSprite;
+
+            // store frame sprite
+            frameSprites[numSprite * 0] = frameSprite;
+            frameSprites[numSprite * 1] = getFlippedFrameSprite(frameSprite, wf, hf, TRUE, FALSE);
+            frameSprites[numSprite * 2] = getFlippedFrameSprite(frameSprite, wf, hf, FALSE, TRUE);
+            frameSprites[numSprite * 3] = getFlippedFrameSprite(frameSprite, wf, hf, TRUE, TRUE);
+            frameSprites++;
         }
     }
 
@@ -210,11 +235,18 @@ spriteDefinition_* getSpriteDefinition(unsigned char *image8bpp, int w, int h, i
     // allocate animation array
     animations = malloc(numAnim * sizeof(animation_*));
     result->animations = animations;
+    result->maxNumTile = 0;
+    result->maxNumSprite = 0;
 
     for(i = 0; i < numAnim; i++)
     {
         *animations = getAnimation(image8bpp, w, i, wf, hf, time, collision);
         if (*animations == NULL) return NULL;
+
+        // update maximum number of tile and sprite
+        result->maxNumTile = MAX(result->maxNumTile, getMaxNumTileAnimation(*animations));
+        result->maxNumSprite = MAX(result->maxNumSprite, getMaxNumSpriteAnimation(*animations));
+
         animations++;
     }
 
@@ -222,18 +254,52 @@ spriteDefinition_* getSpriteDefinition(unsigned char *image8bpp, int w, int h, i
 }
 
 
-int packSpriteDef(spriteDefinition_ *spriteDef, int *method)
+static int getMaxNumTileAnimation(animation_* animation)
 {
-    int i, j, k;
+    int i;
     int result;
-    frameSprite_ **frameSprites;
+    animFrame_** frames;
+
+    result = 0;
+    frames = animation->frames;
+    for(i = 0; i < animation->numFrame; i++)
+    {
+        result = MAX(result, (*frames)->tileset->num);
+        frames++;
+    }
+
+    return result;
+}
+
+static int getMaxNumSpriteAnimation(animation_* animation)
+{
+    int i;
+    int result;
+    animFrame_** frames;
+
+    result = 0;
+    frames = animation->frames;
+    for(i = 0; i < animation->numFrame; i++)
+    {
+        result = MAX(result, (*frames)->numSprite);
+        frames++;
+    }
+
+    return result;
+}
+
+
+int packSpriteDef(spriteDefinition_ *spriteDef, int method)
+{
+    int i, j;
+    int result;
     animFrame_ **animFrames;
     animation_ **animations;
-    frameSprite_ *frameSprite;
     animFrame_ *animFrame;
     animation_ *animation;
 
     result = TRUE;
+
     animations = spriteDef->animations;
 
     for(i = 0; i < spriteDef->numAnimation; i++)
@@ -243,14 +309,10 @@ int packSpriteDef(spriteDefinition_ *spriteDef, int *method)
 
         for(j = 0; j < animation->numFrame; j++)
         {
-            animFrame = *animFrames++;
-            frameSprites = animFrame->frameSprites;
+            int m = method;
 
-            for(k = 0; k < animFrame->numSprite; k++)
-            {
-                frameSprite = *frameSprites++;
-                if (!packTileSet(frameSprite->tileset, method)) result = FALSE;
-            }
+            animFrame = *animFrames++;
+            if (!packTileSet(animFrame->tileset, &m)) result = FALSE;
         }
     }
 
@@ -272,7 +334,8 @@ void removeEmptyFrame(spriteDefinition_ *spriteDef)
         animFrames = animation->frames;
 
         j = animation->numFrame - 1;
-        while((j >= 0) && isEmptyFrame(animFrames[j])) j--;
+        // we force at least 1 frame (even if empty)
+        while((j > 0) && isEmptyFrame(animFrames[j])) j--;
 
         // adjust number of frame
         animation->numFrame = j + 1;
@@ -280,35 +343,27 @@ void removeEmptyFrame(spriteDefinition_ *spriteDef)
     }
 }
 
-int isEmptyFrame(animFrame_ *animFrame)
-{
-    int i;
-    frameSprite_ **frameSprites;
-
-    frameSprites = animFrame->frameSprites;
-
-    for(i = 0; i < animFrame->numSprite; i++)
-        if (!isEmptyFrameSprite(*frameSprites++)) return FALSE;
-
-    return TRUE;
-}
-
-int isEmptyFrameSprite(frameSprite_ *frameSprite)
-{
-    return isEmptyTileSet(frameSprite->tileset);
-}
-
-int isEmptyTileSet(tileset_ *tileset)
+int isEmptyTileData(unsigned int *tiles, int numTiles)
 {
     int i;
     unsigned int *tile;
 
-    i = tileset->num * 8;
-    tile = tileset->tiles;
+    i = numTiles * 8;
+    tile = tiles;
     while(i--)
     {
         if (*tile++) return FALSE;
     }
 
     return TRUE;
+}
+
+int isEmptyTileSet(tileset_ *tileset)
+{
+    return isEmptyTileData(tileset->tiles, tileset->num);
+}
+
+int isEmptyFrame(animFrame_ *animFrame)
+{
+    return isEmptyTileSet(animFrame->tileset);
 }

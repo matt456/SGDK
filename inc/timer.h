@@ -34,7 +34,7 @@
  */
 #define MAXTIMER            16
 
-extern u32 vtimer;
+extern vu32 vtimer;
 
 
 /**
@@ -77,7 +77,7 @@ fix32 getTimeAsFix32(u16 fromTick);
 
 /**
  *  \brief
- *      Start internal timer. (0 <= numtimer < MAXTIMER)
+ *      Start internal timer (0 <= numtimer < MAXTIMER)
  *
  *  \param numTimer
  *      Timer number (0-MAXTIMER)

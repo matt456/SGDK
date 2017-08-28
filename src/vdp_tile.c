@@ -4,13 +4,14 @@
 #include "vdp.h"
 #include "vdp_tile.h"
 
-#include "tools.h"
+#include "memory.h"
 #include "vdp_pal.h"
 #include "vdp_dma.h"
+#include "dma.h"
+#include "tools.h"
 
 #include "font.h"
 #include "tab_cnv.h"
-#include "memory.h"
 
 
 u16 VDP_loadTileSet(const TileSet *tileset, u16 index, u8 use_dma)
@@ -20,23 +21,14 @@ u16 VDP_loadTileSet(const TileSet *tileset, u16 index, u8 use_dma)
     // compressed tileset ?
     if (comp != COMPRESSION_NONE)
     {
-        // RLE compression ?
-        if (comp == COMPRESSION_RLE)
-        {
-            // direct unpack tiles in vram
-            rle4b_unpackVRam((u8*) tileset->tiles, index * 32, 0, 0);
-        }
-        else
-        {
-            // unpack first
-            TileSet *t = unpackTileSet(tileset, NULL);
+        // unpack first
+        TileSet *t = unpackTileSet(tileset, NULL);
 
-            if (t == NULL) return FALSE;
+        if (t == NULL) return FALSE;
 
-            // tiles
-            VDP_loadTileData(t->tiles, index, t->numTile, use_dma);
-            MEM_free(t);
-        }
+        // tiles
+        VDP_loadTileData(t->tiles, index, t->numTile, use_dma);
+        MEM_free(t);
     }
     else
         // tiles
@@ -61,48 +53,13 @@ void VDP_loadBMPTileDataEx(const u32 *data, u16 index, u16 x, u16 y, u16 w, u16 
 }
 
 
-void VDP_fillTileData(u8 value, u16 index, u16 num, u8 use_dma)
+void VDP_fillTileData(u8 value, u16 index, u16 num, u16 wait)
 {
-    u16 addr;
-
-    addr = index * 32;
-
-    if (use_dma)
-    {
-        // wait for previous DMA completion
+    // do DMA fill
+    DMA_doVRamFill(index * 32, num * 32, value, 1);
+    // wait for DMA completion
+    if (wait)
         VDP_waitDMACompletion();
-        // then do DMA
-        VDP_doVRamDMAFill(addr, num * 32, value);
-    }
-    else
-    {
-        vu32 *plctrl;
-        vu32 *pldata;
-        u16 i;
-
-        VDP_setAutoInc(2);
-
-        /* point to vdp port */
-        plctrl = (u32 *) GFX_CTRL_PORT;
-        pldata = (u32 *) GFX_DATA_PORT;
-
-        *plctrl = GFX_WRITE_VRAM_ADDR(addr);
-
-        const u32 data32 = cnv_8to32_tab[value];
-
-        i = num;
-        while(i--)
-        {
-            *pldata = data32;
-            *pldata = data32;
-            *pldata = data32;
-            *pldata = data32;
-            *pldata = data32;
-            *pldata = data32;
-            *pldata = data32;
-            *pldata = data32;
-        }
-    }
 }
 
 
@@ -121,12 +78,29 @@ void VDP_setTileMap(u16 plan, u16 tile, u16 ind)
     *pwdata = tile;
 }
 
-void VDP_setTileMapXY(u16 plan, u16 tile, u16 x, u16 y)
+void VDP_setTileMapXY(VDPPlan plan, u16 tile, u16 x, u16 y)
 {
     vu32 *plctrl;
     vu16 *pwdata;
+    u32 addr;
 
-    const u32 addr = plan + ((x + (VDP_getPlanWidth() * y)) * 2);
+    switch(plan.value)
+    {
+        case CONST_PLAN_A:
+            addr = VDP_PLAN_A + ((x + (y << planWidthSft)) * 2);
+            break;
+
+        case CONST_PLAN_B:
+            addr = VDP_PLAN_B + ((x + (y << planWidthSft)) * 2);
+            break;
+
+        case CONST_PLAN_WINDOW:
+            addr = VDP_PLAN_WINDOW + ((x + (y << windowWidthSft)) * 2);
+            break;
+
+        default:
+            return;
+    }
 
     /* point to vdp port */
     plctrl = (u32 *) GFX_CTRL_PORT;
@@ -176,22 +150,40 @@ void VDP_fillTileMap(u16 plan, u16 tile, u16 ind, u16 num)
     while (i--) *pwdata = tile;
 }
 
-void VDP_fillTileMapRect(u16 plan, u16 tile, u16 x, u16 y, u16 w, u16 h)
+void VDP_fillTileMapRect(VDPPlan plan, u16 tile, u16 x, u16 y, u16 w, u16 h)
 {
     vu32 *plctrl;
     vu16 *pwdata;
     u32 addr;
-    u32 planwidth;
+    u32 width;
     u16 i, j;
+
+    switch(plan.value)
+    {
+        case CONST_PLAN_A:
+            addr = VDP_PLAN_A + ((x + (y << planWidthSft)) * 2);
+            width = planWidth;
+            break;
+
+        case CONST_PLAN_B:
+            addr = VDP_PLAN_B + ((x + (y << planWidthSft)) * 2);
+            width = planWidth;
+            break;
+
+        case CONST_PLAN_WINDOW:
+            addr = VDP_PLAN_WINDOW + ((x + (y << windowWidthSft)) * 2);
+            width = windowWidth;
+            break;
+
+        default:
+            return;
+    }
 
     VDP_setAutoInc(2);
 
     /* point to vdp port */
     plctrl = (u32 *) GFX_CTRL_PORT;
     pwdata = (u16 *) GFX_DATA_PORT;
-
-    planwidth = VDP_getPlanWidth();
-    addr = plan + (2 * (x + (planwidth * y)));
 
     i = h;
     while (i--)
@@ -202,28 +194,25 @@ void VDP_fillTileMapRect(u16 plan, u16 tile, u16 x, u16 y, u16 w, u16 h)
 
         while (j--) *pwdata = tile;
 
-        addr += planwidth * 2;
+        addr += width * 2;
     }
 }
 
-void VDP_clearTileMapRectByIndex(u16 plan, u16 ind, u16 num, u8 use_dma)
+void VDP_clearTileMapRectByIndex(u16 plan, u16 ind, u16 num, u16 wait)
 {
-    VDP_clearTileMap(plan, ind, num, use_dma);
+    VDP_clearTileMap(plan, ind, num, wait);
 }
 
-void VDP_clearTileMap(u16 plan, u16 ind, u16 num, u8 use_dma)
+void VDP_clearTileMap(u16 plan, u16 ind, u16 num, u16 wait)
 {
-    if (use_dma)
-    {
-        // wait for previous DMA completion
+    // do DMA fill
+    DMA_doVRamFill(plan + (ind * 2), num * 2, 0, 1);
+    // wait for DMA completion
+    if (wait)
         VDP_waitDMACompletion();
-        // then do DMA
-        VDP_doVRamDMAFill(plan + (ind * 2), num * 2, 0);
-    }
-    else VDP_fillTileMap(plan, 0, ind, num);
 }
 
-void VDP_clearTileMapRect(u16 plan, u16 x, u16 y, u16 w, u16 h)
+void VDP_clearTileMapRect(VDPPlan plan, u16 x, u16 y, u16 w, u16 h)
 {
     VDP_fillTileMapRect(plan, 0, x, y, w, h);
 }
@@ -277,14 +266,35 @@ void VDP_fillTileMapInc(u16 plan, u16 basetile, u16 ind, u16 num)
     while (i--) *pwdata = tile++;
 }
 
-void VDP_fillTileMapRectInc(u16 plan, u16 basetile, u16 x, u16 y, u16 w, u16 h)
+void VDP_fillTileMapRectInc(VDPPlan plan, u16 basetile, u16 x, u16 y, u16 w, u16 h)
 {
     vu32 *plctrl;
     vu16 *pwdata;
     u32 addr;
-    u32 planwidth;
+    u32 width;
     u16 tile;
     u16 i, j;
+
+    switch(plan.value)
+    {
+        case CONST_PLAN_A:
+            addr = VDP_PLAN_A + ((x + (y << planWidthSft)) * 2);
+            width = planWidth;
+            break;
+
+        case CONST_PLAN_B:
+            addr = VDP_PLAN_B + ((x + (y << planWidthSft)) * 2);
+            width = planWidth;
+            break;
+
+        case CONST_PLAN_WINDOW:
+            addr = VDP_PLAN_WINDOW + ((x + (y << windowWidthSft)) * 2);
+            width = windowWidth;
+            break;
+
+        default:
+            return;
+    }
 
     VDP_setAutoInc(2);
 
@@ -292,8 +302,6 @@ void VDP_fillTileMapRectInc(u16 plan, u16 basetile, u16 x, u16 y, u16 w, u16 h)
     plctrl = (u32 *) GFX_CTRL_PORT;
     pwdata = (u16 *) GFX_DATA_PORT;
 
-    planwidth = VDP_getPlanWidth();
-    addr = plan + (2 * (x + (planwidth * y)));
     tile = basetile;
 
     i = h;
@@ -305,7 +313,7 @@ void VDP_fillTileMapRectInc(u16 plan, u16 basetile, u16 x, u16 y, u16 w, u16 h)
 
         while (j--) *pwdata = tile++;
 
-        addr += planwidth * 2;
+        addr += width * 2;
     }
 }
 
@@ -363,14 +371,35 @@ void VDP_setTileMapData(u16 plan, const u16 *data, u16 ind, u16 num, u8 use_dma)
     }
 }
 
-void VDP_setTileMapDataRect(u16 plan, const u16 *data, u16 x, u16 y, u16 w, u16 h)
+void VDP_setTileMapDataRect(VDPPlan plan, const u16 *data, u16 x, u16 y, u16 w, u16 h)
 {
     vu32 *plctrl;
     vu16 *pwdata;
     const u16 *src;
     u32 addr;
-    u32 planwidth;
+    u32 width;
     u16 i, j;
+
+    switch(plan.value)
+    {
+        case CONST_PLAN_A:
+            addr = VDP_PLAN_A + ((x + (y << planWidthSft)) * 2);
+            width = planWidth;
+            break;
+
+        case CONST_PLAN_B:
+            addr = VDP_PLAN_B + ((x + (y << planWidthSft)) * 2);
+            width = planWidth;
+            break;
+
+        case CONST_PLAN_WINDOW:
+            addr = VDP_PLAN_WINDOW + ((x + (y << windowWidthSft)) * 2);
+            width = windowWidth;
+            break;
+
+        default:
+            return;
+    }
 
     VDP_setAutoInc(2);
 
@@ -378,8 +407,6 @@ void VDP_setTileMapDataRect(u16 plan, const u16 *data, u16 x, u16 y, u16 w, u16 
     plctrl = (u32 *) GFX_CTRL_PORT;
     pwdata = (u16 *) GFX_DATA_PORT;
 
-    planwidth = VDP_getPlanWidth();
-    addr = plan + (2 * (x + (planwidth * y)));
     src = data;
 
     i = h;
@@ -390,7 +417,7 @@ void VDP_setTileMapDataRect(u16 plan, const u16 *data, u16 x, u16 y, u16 w, u16 
         j = w;
         while (j--) *pwdata = *src++;
 
-        addr += planwidth * 2;
+        addr += width * 2;
     }
 }
 
@@ -407,10 +434,10 @@ void VDP_setTileMapDataEx(u16 plan, const u16 *data, u16 basetile, u16 ind, u16 
     const u16 *src;
     const u32 *src32;
     u32 addr;
-    u16 baseindex;
-    u16 baseflags;
+    u16 baseinc;
+    u16 baseor;
     u32 bi32;
-    u32 bf32;
+    u32 bo32;
     u16 i;
 
     VDP_setAutoInc(2);
@@ -424,18 +451,20 @@ void VDP_setTileMapDataEx(u16 plan, const u16 *data, u16 basetile, u16 ind, u16 
     *plctrl = GFX_WRITE_VRAM_ADDR(addr);
 
     src32 = (u32*) data;
-    baseindex = basetile & TILE_INDEX_MASK;
-    baseflags = basetile & TILE_ATTR_MASK;
-    bi32 = (baseindex << 16) | baseindex;
-    bf32 = (baseflags << 16) | baseflags;
+    // we can increment both index and palette
+    baseinc = basetile & (TILE_INDEX_MASK | TILE_ATTR_PALETTE_MASK);
+    // we can only do logical OR on priority and HV flip
+    baseor = basetile & (TILE_ATTR_PRIORITY_MASK | TILE_ATTR_VFLIP_MASK | TILE_ATTR_HFLIP_MASK);
+    bi32 = (baseinc << 16) | baseinc;
+    bo32 = (baseor << 16) | baseor;
 
     i = num >> 3;
     while (i--)
     {
-        *pldata = bf32 | (*src32++ + bi32);
-        *pldata = bf32 | (*src32++ + bi32);
-        *pldata = bf32 | (*src32++ + bi32);
-        *pldata = bf32 | (*src32++ + bi32);
+        *pldata = bo32 | (*src32++ + bi32);
+        *pldata = bo32 | (*src32++ + bi32);
+        *pldata = bo32 | (*src32++ + bi32);
+        *pldata = bo32 | (*src32++ + bi32);
     }
 
     pwdata = (u16 *) GFX_DATA_PORT;
@@ -443,24 +472,45 @@ void VDP_setTileMapDataEx(u16 plan, const u16 *data, u16 basetile, u16 ind, u16 
     src = (u16*) src32;
 
     i = num & 7;
-    while (i--) *pwdata = baseflags | (*src++ + baseindex);
+    while (i--) *pwdata = baseor | (*src++ + baseinc);
 }
 
-void VDP_setTileMapRectEx(u16 plan, const u16 *data, u16 baseindex, u16 baseflags, u16 x, u16 y, u16 w, u16 h)
+void VDP_setTileMapRectEx(VDPPlan plan, const u16 *data, u16 baseindex, u16 baseflags, u16 x, u16 y, u16 w, u16 h)
 {
     VDP_setTileMapDataRectEx(plan, data, baseflags | baseindex, x, y, w, h, w);
 }
 
-void VDP_setTileMapDataRectEx(u16 plan, const u16 *data, u16 basetile, u16 x, u16 y, u16 w, u16 h, u16 wm)
+void VDP_setTileMapDataRectEx(VDPPlan plan, const u16 *data, u16 basetile, u16 x, u16 y, u16 w, u16 h, u16 wm)
 {
     vu32 *plctrl;
     vu16 *pwdata;
     const u16 *src;
     u32 addr;
-    u32 planwidth;
-    u16 baseindex;
-    u16 baseflags;
+    u32 width;
+    u16 baseinc;
+    u16 baseor;
     u16 i, j;
+
+    switch(plan.value)
+    {
+        case CONST_PLAN_A:
+            addr = VDP_PLAN_A + ((x + (y << planWidthSft)) * 2);
+            width = planWidth;
+            break;
+
+        case CONST_PLAN_B:
+            addr = VDP_PLAN_B + ((x + (y << planWidthSft)) * 2);
+            width = planWidth;
+            break;
+
+        case CONST_PLAN_WINDOW:
+            addr = VDP_PLAN_WINDOW + ((x + (y << windowWidthSft)) * 2);
+            width = windowWidth;
+            break;
+
+        default:
+            return;
+    }
 
     VDP_setAutoInc(2);
 
@@ -468,10 +518,10 @@ void VDP_setTileMapDataRectEx(u16 plan, const u16 *data, u16 basetile, u16 x, u1
     plctrl = (u32 *) GFX_CTRL_PORT;
     pwdata = (u16 *) GFX_DATA_PORT;
 
-    planwidth = VDP_getPlanWidth();
-    baseindex = basetile & TILE_INDEX_MASK;
-    baseflags = basetile & TILE_ATTR_MASK;
-    addr = plan + (2 * (x + (planwidth * y)));
+    // we can increment both index and palette
+    baseinc = basetile & (TILE_INDEX_MASK | TILE_ATTR_PALETTE_MASK);
+    // we can only do logical OR on priority and HV flip
+    baseor = basetile & (TILE_ATTR_PRIORITY_MASK | TILE_ATTR_VFLIP_MASK | TILE_ATTR_HFLIP_MASK);
     src = data;
 
     i = h;
@@ -480,20 +530,20 @@ void VDP_setTileMapDataRectEx(u16 plan, const u16 *data, u16 basetile, u16 x, u1
         *plctrl = GFX_WRITE_VRAM_ADDR(addr);
 
         j = w;
-        while (j--) *pwdata = baseflags | (*src++ + baseindex);
+        while (j--) *pwdata = baseor | (*src++ + baseinc);
 
         src += wm - w;
-        addr += planwidth * 2;
+        addr += width * 2;
     }
 }
 
 
-u16 VDP_setMap(u16 plan, const Map *map, u16 basetile, u16 x, u16 y)
+u16 VDP_setMap(VDPPlan plan, const Map *map, u16 basetile, u16 x, u16 y)
 {
     return VDP_setMapEx(plan, map, basetile, x, y, 0, 0, map->w, map->h);
 }
 
-u16 VDP_setMapEx(u16 plan, const Map *map, u16 basetile, u16 x, u16 y, u16 xm, u16 ym, u16 wm, u16 hm)
+u16 VDP_setMapEx(VDPPlan plan, const Map *map, u16 basetile, u16 x, u16 y, u16 xm, u16 ym, u16 wm, u16 hm)
 {
     const u16 comp = map->compression;
     const u16 offset = (ym * map->w) + xm;

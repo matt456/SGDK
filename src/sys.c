@@ -19,6 +19,7 @@
 #include "vdp_pal.h"
 #include "tile_cache.h"
 #include "sound.h"
+#include "xgm.h"
 #include "dma.h"
 
 #include "tools.h"
@@ -51,7 +52,7 @@ extern int main(u16 hard);
 
 static void internal_reset();
 
-// interrrupt callback
+// exception callbacks
 _voidCallback *busErrorCB;
 _voidCallback *addressErrorCB;
 _voidCallback *illegalInstCB;
@@ -67,25 +68,25 @@ _voidCallback *internalVIntCB;
 _voidCallback *internalHIntCB;
 _voidCallback *internalExtIntCB;
 
-// user V-Int, H-Int and Ext-Int callback
+// user V-Int, H-Int and Ext-Int callbacks
 static _voidCallback *VIntCBPre;
 static _voidCallback *VIntCB;
 static _voidCallback *HIntCB;
 static _voidCallback *ExtIntCB;
 
 
-u32 registerState[8+8];
-u32 pcState;
-u32 addrState;
-u16 ext1State;
-u16 ext2State;
-u16 srState;
+// exception state consumes 78 bytes of memory
+__attribute__((externally_visible)) u32 registerState[8+8];
+__attribute__((externally_visible)) u32 pcState;
+__attribute__((externally_visible)) u32 addrState;
+__attribute__((externally_visible)) u16 ext1State;
+__attribute__((externally_visible)) u16 ext2State;
+__attribute__((externally_visible)) u16 srState;
 
-
-vu32 VIntProcess;
-vu32 HIntProcess;
-vu32 ExtIntProcess;
-vu16 intTrace;
+__attribute__((externally_visible)) vu32 VIntProcess;
+__attribute__((externally_visible)) vu32 HIntProcess;
+__attribute__((externally_visible)) vu32 ExtIntProcess;
+__attribute__((externally_visible)) vu16 intTrace;
 
 static u16 intLevelSave;
 static s16 disableIntStack;
@@ -225,7 +226,7 @@ static u16 showStackState(u16 pos)
     while(i < 24)
     {
         strclr(s);
-        addValueU8(s, "SP+", i);
+        addValueU8(s, "SP+", i * 4);
         strcat(s, " ");
         y = showValueU32U32(s, *(sp + (i + 0)), " ", *(sp + (i + 1)), y);
         i += 2;
@@ -402,14 +403,14 @@ void _vint_callback()
             // DMA protection for XGM driver
             if (currentDriver == Z80_DRIVER_XGM)
             {
-                SND_set68KBUSProtection_XGM(TRUE);
+                XGM_set68KBUSProtection(TRUE);
 
                 // delay enabled ? --> wait a bit to improve PCM playback (test on SOR2)
                 if (SND_getForceDelayDMA_XGM()) waitSubTick(10);
 
                 DMA_flushQueue();
 
-                SND_set68KBUSProtection_XGM(FALSE);
+                XGM_set68KBUSProtection(FALSE);
             }
             else
                 DMA_flushQueue();
@@ -482,7 +483,7 @@ void _extint_callback()
 void _start_entry()
 {
     // initiate random number generator
-    randbase = 0xD94B ^ GET_HVCOUNTER;
+    setRandomSeed(0xC427);
     vtimer = 0;
 
     // default interrupt callback
@@ -611,6 +612,7 @@ static void internal_reset()
     // init part
     MEM_init();
     VDP_init();
+    DMA_init(0, 0);
     PSG_init();
     JOY_init();
     // reseting z80 also reset the ym2612
@@ -625,8 +627,9 @@ void SYS_disableInts()
     // in interrupt --> return
     if (intTrace != 0)
     {
-        if (LIB_DEBUG)
-            KDebug_Alert("SYS_disableInts() fails: call during interrupt");
+#if (LIB_DEBUG != 0)
+        KDebug_Alert("SYS_disableInts() fails: call during interrupt");
+#endif
 
         return;
     }
@@ -634,8 +637,10 @@ void SYS_disableInts()
     // disable interrupts
     if (disableIntStack++ == 0)
         intLevelSave = SYS_getAndSetInterruptMaskLevel(7);
-    else if (LIB_DEBUG)
+#if (LIB_DEBUG != 0)
+    else
         KDebug_Alert("SYS_disableInts() info: inner call");
+#endif
 }
 
 void SYS_enableInts()
@@ -643,8 +648,9 @@ void SYS_enableInts()
     // in interrupt --> return
     if (intTrace != 0)
     {
-        if (LIB_DEBUG)
-            KDebug_Alert("SYS_enableInts() fails: call during interrupt");
+#if (LIB_DEBUG != 0)
+        KDebug_Alert("SYS_enableInts() fails: call during interrupt");
+#endif
 
         return;
     }
@@ -652,13 +658,15 @@ void SYS_enableInts()
     // reenable interrupts
     if (--disableIntStack == 0)
         SYS_setInterruptMaskLevel(intLevelSave);
-    else if (LIB_DEBUG)
+#if (LIB_DEBUG != 0)
+    else
     {
         if (disableIntStack < 0)
             KDebug_Alert("SYS_enableInts() fails: already enabled");
         else
             KDebug_Alert("SYS_enableInts() info: inner call");
     }
+#endif
 }
 
 void SYS_setVIntPreCallback(_voidCallback *CB)

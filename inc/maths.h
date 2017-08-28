@@ -26,19 +26,19 @@ extern const fix16 sqrttab16[0x10000];
  *  \brief
  *      Returns the lowest value between X an Y.
  */
-#define min(X, Y) ((X) < (Y))?(X):(Y)
+#define min(X, Y)   (((X) < (Y))?(X):(Y))
 
 /**
  *  \brief
  *      Returns the highest value between X an Y.
  */
-#define max(X, Y) ((X) > (Y))?(X):(Y)
+#define max(X, Y)   (((X) > (Y))?(X):(Y))
 
 /**
  *  \brief
  *      Returns the absolute value of X.
  */
-#define abs(X) ((X) < 0)?-(X):(X)
+#define abs(X)      (((X) < 0)?-(X):(X))
 
 #ifndef PI
 /**
@@ -59,7 +59,7 @@ extern const fix16 sqrttab16[0x10000];
  *  \brief
  *      Convert specified value to fix32.
  *
- *  EX:<br/>
+ *  EX:<br>
  *      f32 v = FIX32(34.567);
  */
 #define FIX32(value)                ((fix32) ((value) * (1 << FIX32_FRAC_BITS)))
@@ -138,7 +138,7 @@ extern const fix16 sqrttab16[0x10000];
  *  \brief
  *      Convert specified value to fix16
  *
- *  EX:<br/>
+ *  EX:<br>
  *      f16 v = FIX16(-27.12);
  */
 #define FIX16(value)                ((fix16) ((value) * (1 << FIX16_FRAC_BITS)))
@@ -386,12 +386,6 @@ typedef struct
 
 /**
  *  \brief
- *      Return a random u16 integer.
- */
-u16 random();
-
-/**
- *  \brief
  *      Binary to Decimal conversion.
  *
  *  \param value
@@ -399,6 +393,11 @@ u16 random();
  */
 u32 intToBCD(u32 value);
 
+/**
+ *  \deprecated
+ *      Use #getApproximatedDistance(..) instead.
+ */
+u32 distance_approx(s32 dx, s32 dy);
 /**
  *  \brief
  *      Return euclidean distance approximation for specified vector.<br>
@@ -409,80 +408,30 @@ u32 intToBCD(u32 value);
  *  \param dy
  *      delta Y.
  */
-u32 distance_approx(s32 dx, s32 dy);
+u32 getApproximatedDistance(s32 dx, s32 dy);
+/**
+ *  \brief
+ *      Return 16.16 fixed point *approximation* of log2 of the specified 16.16 fixed point value.
+ *      Ex:<br>
+ *      getLog2(1 << 16) = 0<br>
+ *      getLog2(12345 << 16) = ~9.5 (real value = ~13.6)<br>
+ *
+ *  \param value
+ *      16.16 fixed point value to return log2 of
+ */
+s32 getApproximatedLog2(s32 value);
+/**
+ *  \brief
+ *      Return integer log2 of specified 32 bits unsigned value.
+ *      Ex:<br>
+ *      getLog2Int(1024) = 10<br>
+ *      getLog2Int(12345) = 13<br>
+ *
+ *  \param value
+ *      value to return log2 of
+ */
+u16 getLog2Int(u32 value);
 
-/**
- *  \brief
- *      Quick sort algo on u8 data array.
- *
- *  \param data
- *      u8 data pointer.
- *  \param left
- *      left index (should be 0).
- *  \param right
- *      right index (should be table size - 1).
- */
-void QSort_u8(u8 *data, u16 left, u16 right);
-/**
- *  \brief
- *      Quick sort algo on s8 data array.
- *
- *  \param data
- *      s8 data pointer.
- *  \param left
- *      left index (should be 0).
- *  \param right
- *      right index (should be table size - 1).
- */
-void QSort_s8(s8 *data, u16 left, u16 right);
-/**
- *  \brief
- *      Quick sort algo on u16 data array.
- *
- *  \param data
- *      u16 data pointer.
- *  \param left
- *      left index (should be 0).
- *  \param right
- *      right index (should be table size - 1).
- */
-void QSort_u16(u16 *data, u16 left, u16 right);
-/**
- *  \brief
- *      Quick sort algo on s16 data array.
- *
- *  \param data
- *      s16 data pointer.
- *  \param left
- *      left index (should be 0).
- *  \param right
- *      right index (should be table size - 1).
- */
-void QSort_s16(s16 *data, u16 left, u16 right);
-/**
- *  \brief
- *      Quick sort algo on u32 data array.
- *
- *  \param data
- *      u32 data pointer.
- *  \param left
- *      left index (should be 0).
- *  \param right
- *      right index (should be table size - 1).
- */
-void QSort_u32(u32 *data, u16 left, u16 right);
-/**
- *  \brief
- *      Quick sort algo on s32 data array.
- *
- *  \param data
- *      s32 data pointer.
- *  \param left
- *      left index (should be 0).
- *  \param right
- *      right index (should be table size - 1).
- */
-void QSort_s32(s32 *data, u16 left, u16 right);
 
 
 #endif // _MATHS_H_

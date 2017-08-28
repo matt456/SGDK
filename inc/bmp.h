@@ -7,46 +7,40 @@
  * This unit provides methods to simulate bitmap mode on SEGA genesis.<br>
  *<br>
  * The software bitmap engine permit to simulate a 256x160 pixels bitmap screen.<br>
- * Almost methods as #BMP_setPixel and #BMP_drawLine however use doubled X pixel so you can
+ * Some methods as #BMP_setPixel and #BMP_drawLine use doubled X pixel so you can
  * consider resolution to be 128x160 in this case.<br>
- * It uses a double buffer so you can draw to buffer while other buffer is being sent to video memory.<br>
- * Bitmap buffer requires ~41 KB of memory which is dynamically allocated.<br>
- * These buffers are transfered to VRAM during blank area, by default on NTSC system the blanking period<br>
- * is very short so it takes approximately 10 frames to blit an entire buffer.<br>
+ * Bitmap engine requires a large amount of memory (~41KB) which is dynamically allocated at BMP_init(..) time and released when BMP_end) is called.<br>
+ * Bitmap engine uses a double buffer so you can draw to the write buffer while the read buffer is being sent to video memory.<br>
+ * These buffers are transfered to VRAM during blank area, by default on NTSC system the blanking period is really short so it takes approximately 10 frames to blit an entire buffer.<br>
  * To improve transfer performance the blank area is extended to fit bitmap resolution:<br>
- * 0-31 = blank<br>
- * 32-191 = active<br>
- * 192-262/312 = blank<br>
+ * scanline 0-31 = blank<br>
+ * scanline 32-191 = active<br>
+ * scanline 192-262/312 = blank<br>
  * <br>
- * With extended blank bitmap can be transfered to VRAM 20 times per second in NTSC<br>
+ * With extended blank bitmap buffer can be transfered to VRAM 20 times per second in NTSC<br>
  * and 25 time per second in PAL.
  */
 
 #include "maths.h"
+#include "vdp.h"
 #include "vdp_pal.h"
 
 #ifndef _BMP_H_
 #define _BMP_H_
 
-/**
- *  \brief
- *          Plan used to draw bitmap (plan A).
- */
-#define BMP_PLAN                    APLAN
-#define BMP_PLAN_ENUM               PLAN_A
 
-#define BMP_PLANWIDTH_SFT           6
-#define BMP_PLANHEIGHT_SFT          6
+#define BMP_PLANWIDTH_SFT           planWidthSft
+#define BMP_PLANHEIGHT_SFT          planHeightSft
 /**
  *  \brief
- *          Bitmap plan width (in tile) : 64
+ *          Bitmap plan width (in tile)
  */
-#define BMP_PLANWIDTH               (1 << BMP_PLANWIDTH_SFT)
+#define BMP_PLANWIDTH               planWidth
 /**
  *  \brief
- *          Bitmap plan height (in tile) : 64
+ *          Bitmap plan height (in tile)
  */
-#define BMP_PLANHEIGHT              (1 << BMP_PLANHEIGHT_SFT)
+#define BMP_PLANHEIGHT              planHeight
 
 #define BMP_CELLWIDTH_SFT           5
 /**
@@ -165,21 +159,17 @@
 #define BMP_FB0TILE             (BMP_FB0TILEINDEX * 32)
 #define BMP_FB1TILE             (BMP_FB1TILEINDEX * 32)
 
-#define BMP_FB0TILEMAP_BASE     BMP_PLAN
-#define BMP_FB1TILEMAP_BASE     (BMP_PLAN + ((BMP_PLANWIDTH * (BMP_PLANHEIGHT / 2)) * 2))
-#define BMP_FBTILEMAP_OFFSET    (((BMP_PLANWIDTH * BMP_CELLYOFFSET) + BMP_CELLXOFFSET) * 2)
-
 
 /**
  *  \brief
- *      Genesis 4bpp Bitmap structure definition.<br/>
+ *      Genesis 4bpp Bitmap structure definition.<br>
  *      Use the unpackBitmap() method to unpack if compression is enabled.
  *
  *  \param compression
- *      compression type for image data, accepted values:<br/>
- *      <b>COMPRESSION_NONE</b><br/>
- *      <b>COMPRESSION_APLIB</b><br/>
- *      <b>COMPRESSION_RLE</b><br/>
+ *      compression type for image data, accepted values:<br>
+ *      <b>COMPRESSION_NONE</b><br>
+ *      <b>COMPRESSION_APLIB</b><br>
+ *      <b>COMPRESSION_LZ4W</b><br>
  *  \param w
  *      Width in pixel.
  *  \param h
@@ -271,6 +261,11 @@ extern u8 *bmp_buffer_write;
  *      Enabled VRAM double buffer.<br>
  *      VRAM Double buffer permit to avoid image tearing because of partial screen refresh.<br>
  *      It requires almost all VRAM tiles space (~41 KB) so enable it only if you don't need other plan or sprites.
+ *  \param plan
+ *      Plan to use to display the bitmap.<br>
+ *      Accepted values are:<br>
+ *      - PLAN_A<br>
+ *      - PLAN_B<br>
  *  \param palette
  *      Palette index to use to render the bitmap plan.<br>
  *      Set it to 0 if unsure.
@@ -281,7 +276,7 @@ extern u8 *bmp_buffer_write;
  *
  * Requires ~41 KB of memory which is dynamically allocated.
  */
-void BMP_init(u16 double_buffer, u16 palette, u16 priority);
+void BMP_init(u16 double_buffer, VDPPlan plan, u16 palette, u16 priority);
 /**
  *  \brief
  *      End the software bitmap engine.
@@ -296,7 +291,18 @@ void BMP_end();
  * Rebuild tilemap for bitmap engine and clear buffers.
  */
 void BMP_reset();
-
+/**
+ *  \brief
+ *      Enable back buffer preservation.
+ *
+ * The bitmap engine is always using double buffering in maim memory so you can continue to write your bitmap
+ * while the previous bitmap is being transfered to video memory.<br>
+ * The problem with double buffer is that your content is not preserved on a frame basis as you have 2 differents buffers,
+ * by enabling "buffer copy" you can preserve your bitmap but this has an important CPU cost as we need to copy bitmap buffer
+ * at each flip operation.<br>
+ * By default buffer copy is disabled for obvious performance reason.
+ */
+void BMP_setBufferCopy(u16 value);
 /**
  *  \brief
  *      Flip bitmap buffer to screen.
@@ -559,11 +565,11 @@ void BMP_drawBitmapData(const u8 *data, u16 x, u16 y, u16 w, u16 h, u32 pitch);
  *  \brief
  *      Draw a Genesis Bitmap.<br>
  *
- *      A Genesis bitmap is automatically created from .bmp or .png file via the rescomp tool.<br/>
- *      The resulting file contains bitmap size info and 16 colors palette.<br/>
+ *      A Genesis bitmap is automatically created from .bmp or .png file via the rescomp tool.<br>
+ *      The resulting file contains bitmap size info and 16 colors palette.<br>
  *
  *  \param bitmap
- *      Genesis Bitmap.<br/>
+ *      Genesis Bitmap.<br>
  *      The Bitmap is unpacked "on the fly" if needed (require some memory).
  *  \param x
  *      X coordinate (should be an even value).
@@ -587,7 +593,7 @@ u16 BMP_drawBitmap(const Bitmap *bitmap, u16 x, u16 y, u16 loadpal);
  *      This method will scale and draw the bitmap with the specified dimension.
  *
  *  \param bitmap
- *      Genesis bitmap.<br/>
+ *      Genesis bitmap.<br>
  *      The Bitmap is unpacked "on the fly" if needed (require some memory).
  *  \param x
  *      X coordinate (should be an even value).
